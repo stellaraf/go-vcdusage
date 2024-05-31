@@ -15,6 +15,7 @@ type Environment struct {
 	Memory   float64 `env:"VCD_MEMORY"`
 	Storage  float64 `env:"VCD_STORAGE"`
 	VMCount  uint64  `env:"VCD_VM_COUNT"`
+	VdcID    string  `env:"VCD_VDC_ID"`
 }
 
 var Env Environment

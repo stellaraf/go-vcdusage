@@ -37,4 +37,20 @@ func Test_VDCs(t *testing.T) {
 			assert.Equal(t, Env.VMCount, vmCount, "mismatching VM count: %v != %v", Env.VMCount, vmCount)
 		})
 	}
+	t.Run("individual VDC", func(t *testing.T) {
+		t.Parallel()
+		vdc, err := client.VDC(Env.OrgID, Env.VdcID)
+		require.NoError(t, err)
+		cores := vdc.CoreCount()
+		mem := vdc.Memory()
+		stor := vdc.Storage()
+		vmCount := vdc.VMCount()
+		assert.NotZero(t, cores, "core count zero")
+		assert.NotZero(t, mem.Float64(), "memory zero")
+		assert.NotZero(t, stor.Float64(), "storage zero")
+		assert.Equal(t, Env.Cores, cores, "mismatching core count: %v != %v", Env.Cores, cores)
+		assert.Equal(t, Env.Memory, mem.GB(), "mismatching memory: %v != %v", Env.Memory, mem.GB())
+		assert.Equal(t, Env.Storage, stor.GB(), "mismatching storage: %v != %v", Env.Storage, stor.GB())
+		assert.Equal(t, Env.VMCount, vmCount, "mismatching VM count: %v != %v", Env.VMCount, vmCount)
+	})
 }

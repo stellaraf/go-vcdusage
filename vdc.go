@@ -112,15 +112,44 @@ func (vdc *VDC) VMCount() uint64 {
 	return count
 }
 
-// VDCs retrieves all VDCs associated with an organization and provides a wrapper for utilization
-// functions for each VDC.
-func (client *Client) VDCs(orgID string) ([]VDC, error) {
+// Org retrieves a vCloud Organization object.
+func (client *Client) Org(orgID string) (*govcd.AdminOrg, error) {
 	if !strings.HasPrefix(orgID, "urn:vcloud:org:") {
 		orgID = fmt.Sprintf("urn:vcloud:org:%s", orgID)
 	}
 	org, err := client.VCD.GetAdminOrgById(orgID)
 	if err != nil {
 		err = errorx.Decorate(err, "failed to retrieve org '%s'", orgID)
+		return nil, err
+	}
+	return org, nil
+}
+
+// VDC retrieves a single VDC associated with an organization by its ID and provides a wrapper for
+// utilization functions for each VDC.
+func (client *Client) VDC(orgID string, id string) (*VDC, error) {
+	org, err := client.Org(orgID)
+	if err != nil {
+		return nil, err
+	}
+	obj, err := org.GetVDCById(id, false)
+	if err != nil {
+		err = errorx.Decorate(err, "failed to retrieve VDC '%s' for org '%s'", id, orgID)
+		return nil, err
+	}
+	vdc := &VDC{
+		Obj:      obj,
+		AdminOrg: org,
+		Client:   client,
+	}
+	return vdc, nil
+}
+
+// VDCs retrieves all VDCs associated with an organization and provides a wrapper for utilization
+// functions for each VDC.
+func (client *Client) VDCs(orgID string) ([]VDC, error) {
+	org, err := client.Org(orgID)
+	if err != nil {
 		return nil, err
 	}
 	vdcs, err := org.GetAllVDCs(false)
