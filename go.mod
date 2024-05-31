@@ -3,6 +3,7 @@ module github.com/stellaraf/go-vcdusage
 go 1.22.1
 
 require (
+	github.com/destel/rill v0.1.2
 	github.com/joomcode/errorx v1.1.1
 	github.com/stellaraf/go-utils v0.1.3
 	github.com/stretchr/testify v1.8.4

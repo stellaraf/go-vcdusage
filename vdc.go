@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/destel/rill"
 	"github.com/joomcode/errorx"
 	"github.com/vmware/go-vcloud-director/v2/govcd"
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
@@ -15,6 +16,70 @@ type VDC struct {
 	Obj      *govcd.Vdc
 	AdminOrg *govcd.AdminOrg
 	Client   *Client
+}
+
+// VDCs is a slice of vcdusage.VDC wrappers.
+type VDCs []VDC
+
+// CoreCount retrieves the allocated CPU MHz for a VDC and calculates the number of cores allocated
+// to all VDCs by dividing the total allocated CPU MHz by the CPU speed.
+//
+// For example, if the speed is 3.1 GHz and the allocation amount is 49.6, the core count is 16.
+func (vdcs VDCs) CoreCount() uint64 {
+	vdcSlice := rill.FromSlice(vdcs, nil)
+	count := uint64(0)
+	rill.ForEach(vdcSlice, len(vdcs), func(vdc VDC) error {
+		count += vdc.CoreCount()
+		return nil
+	})
+	return count
+}
+
+// Memory retrieves the amount of allocated memory to all VDCs, represented as a DataStorage type.
+func (vdcs VDCs) Memory() DataStorage {
+	vdcSlice := rill.FromSlice(vdcs, nil)
+	mem := DataStorage(0)
+	rill.ForEach(vdcSlice, len(vdcs), func(vdc VDC) error {
+		mem += vdc.Memory()
+		return nil
+	})
+	return mem
+}
+
+// Memory retrieves the amount of allocated storage to all VDCs, represented as a DataStorage type.
+func (vdcs VDCs) Storage() DataStorage {
+	vdcSlice := rill.FromSlice(vdcs, nil)
+	stor := DataStorage(0)
+	rill.ForEach(vdcSlice, len(vdcs), func(vdc VDC) error {
+		stor += vdc.Storage()
+		return nil
+	})
+	return stor
+}
+
+// VMCount retrieves the number of VMs deployed in all VDCs.
+func (vdcs VDCs) VMCount() uint64 {
+	vdcSlice := rill.FromSlice(vdcs, nil)
+	count := uint64(0)
+	rill.ForEach(vdcSlice, len(vdcs), func(vdc VDC) error {
+		count += vdc.VMCount()
+		return nil
+	})
+	return count
+}
+
+// Speed retrieves the max CPU speed of all VDCs in MHz. This is required for calculating core count.
+func (vdcs VDCs) Speed() uint64 {
+	vdcSlice := rill.FromSlice(vdcs, nil)
+	speed := uint64(0)
+	rill.ForEach(vdcSlice, len(vdcs), func(vdc VDC) error {
+		vdcSpeed := vdc.Speed()
+		if vdcSpeed > speed {
+			speed = vdcSpeed
+		}
+		return nil
+	})
+	return speed
 }
 
 // Speed retrieves the CPU speed of a VDC in MHz. This is required for calculating core count.
@@ -147,7 +212,7 @@ func (client *Client) VDC(orgID string, id string) (*VDC, error) {
 
 // VDCs retrieves all VDCs associated with an organization and provides a wrapper for utilization
 // functions for each VDC.
-func (client *Client) VDCs(orgID string) ([]VDC, error) {
+func (client *Client) VDCs(orgID string) (VDCs, error) {
 	org, err := client.Org(orgID)
 	if err != nil {
 		return nil, err
