@@ -16,6 +16,12 @@ type Environment struct {
 	Storage  float64 `env:"VCD_STORAGE"`
 	VMCount  uint64  `env:"VCD_VM_COUNT"`
 	VdcID    string  `env:"VCD_VDC_ID"`
+	OrgID2   string  `env:"VCD2_ORG_ID"`
+	Cores2   uint64  `env:"VCD2_CORES"`
+	Memory2  float64 `env:"VCD2_MEMORY"`
+	Storage2 float64 `env:"VCD2_STORAGE"`
+	VMCount2 uint64  `env:"VCD2_VM_COUNT"`
+	VdcID2   string  `env:"VCD2_VDC_ID"`
 }
 
 var Env Environment

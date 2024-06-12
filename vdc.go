@@ -6,9 +6,20 @@ import (
 
 	"github.com/destel/rill"
 	"github.com/joomcode/errorx"
+	"github.com/stellaraf/go-utils"
 	"github.com/vmware/go-vcloud-director/v2/govcd"
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
 )
+
+func isValidStatus(status string) bool {
+	valid := []int{2, 3, 4, 8}
+	for _, v := range valid {
+		if status == types.VAppStatuses[v] {
+			return true
+		}
+	}
+	return false
+}
 
 // VDC is a wrapper around a govcd.Vdc object with references to the corresponding Admin Org and
 // vcdusage.Client.
@@ -63,6 +74,17 @@ func (vdcs VDCs) VMCount() uint64 {
 	count := uint64(0)
 	rill.ForEach(vdcSlice, len(vdcs), func(vdc VDC) error {
 		count += vdc.VMCount()
+		return nil
+	})
+	return count
+}
+
+// PoweredOnVMCount retrieves the number of powered on VMs deployed in all VDCs.
+func (vdcs VDCs) PoweredOnVMCount() uint64 {
+	vdcSlice := rill.FromSlice(vdcs, nil)
+	count := uint64(0)
+	rill.ForEach(vdcSlice, len(vdcs), func(vdc VDC) error {
+		count += vdc.PoweredOnVMCount()
 		return nil
 	})
 	return count
@@ -139,20 +161,47 @@ func (vdc *VDC) Memory() DataStorage {
 	return DataStorage(bm)
 }
 
+// storageProfiles retrieves all storage profiles for a VDC and filters out partial duplicates, for
+// example, when Veeam CDP creates a storage profile for the datastore.
+func (vdc *VDC) storageProfiles() ([]types.QueryResultProviderVdcStorageProfileRecordType, error) {
+	avdc, err := vdc.AdminOrg.GetAdminVDCById(vdc.Obj.Vdc.ID, false)
+	if err != nil {
+		return nil, err
+	}
+	profiles := make([]types.QueryResultProviderVdcStorageProfileRecordType, 0)
+	for _, stor := range avdc.AdminVdc.VdcStorageProfiles.VdcStorageProfile {
+		sp, err := vdc.Client.VCD.QueryProviderVdcStorageProfileByName(stor.Name, avdc.AdminVdc.ProviderVdcReference.HREF)
+		if err != nil {
+			return nil, err
+		}
+		profiles = append(profiles, *sp)
+	}
+	names := make([]string, 0, len(profiles))
+	for _, prof := range profiles {
+		names = append(names, prof.Name)
+	}
+	fNames := utils.FilterPartialDuplicates(names)
+	filtered := make([]types.QueryResultProviderVdcStorageProfileRecordType, 0, len(fNames))
+	for _, n := range fNames {
+		for _, p := range profiles {
+			if n == p.Name {
+				filtered = append(filtered, p)
+			}
+		}
+	}
+	return filtered, nil
+}
+
 // Storage retrieves the total amount of used storage for an oVDC. If multiple storage
 // polices are attached an oVDC, the amount will include the sum of all storage policies.
 func (vdc *VDC) Storage() DataStorage {
-	avdc, err := vdc.AdminOrg.GetAdminVDCById(vdc.Obj.Vdc.ID, false)
+	profiles, err := vdc.storageProfiles()
 	if err != nil {
 		return 0
 	}
 	bs := float64(0)
-	for _, stor := range avdc.AdminVdc.VdcStorageProfiles.VdcStorageProfile {
-		sp, err := vdc.Client.VCD.QueryProviderVdcStorageProfileByName(stor.Name, avdc.AdminVdc.ProviderVdcReference.HREF)
-		if err != nil {
-			return 0
-		}
-		sb := sp.StorageUsedMB * mb
+	for _, prof := range profiles {
+		sb := prof.StorageUsedMB * mb
 		bs += float64(sb)
 	}
 	return DataStorage(bs)
@@ -168,9 +217,30 @@ func (vdc *VDC) VMCount() uint64 {
 	if err != nil {
 		return 0
 	}
+
 	count := uint64(0)
 	for _, vm := range vms {
-		if vm.Deployed {
+		vm := vm
+		if isValidStatus(vm.Status) && !vm.VAppTemplate && !vm.Deleted {
+			count++
+		}
+	}
+	return count
+}
+
+// PoweredOnVMCount retrieves the number of powered-on
+func (vdc *VDC) PoweredOnVMCount() uint64 {
+	ovdc, err := vdc.AdminOrg.GetVDCById(vdc.Obj.Vdc.ID, false)
+	if err != nil {
+		return 0
+	}
+	vms, err := ovdc.QueryVmList(types.VmQueryFilterAll)
+	if err != nil {
+		return 0
+	}
+	count := uint64(0)
+	for _, vm := range vms {
+		if vm.Status == types.VAppStatuses[4] && !vm.VAppTemplate && !vm.Deleted {
 			count++
 		}
 	}
