@@ -77,7 +77,7 @@ func Test_VDCs(t *testing.T) {
 		t.Parallel()
 		vdc, err := client.VDC(Env.OrgID2, Env.VdcID2)
 		require.NoError(t, err)
-		stor := vdc.Storage()
+		stor := vdc.StorageAll()
 		vmCount := vdc.VMCount()
 		assert.NotZero(t, stor.Float64(), "storage zero")
 		assert.Equal(t, Env.Storage2, stor.GB(), "mismatching storage: %v != %v", Env.Storage2, stor.GB())

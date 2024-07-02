@@ -6,7 +6,6 @@ import (
 
 	"github.com/destel/rill"
 	"github.com/joomcode/errorx"
-	"github.com/stellaraf/go-utils"
 	"github.com/vmware/go-vcloud-director/v2/govcd"
 	"github.com/vmware/go-vcloud-director/v2/types/v56"
 )
@@ -161,41 +160,56 @@ func (vdc *VDC) Memory() DataStorage {
 	return DataStorage(bm)
 }
 
-// storageProfiles retrieves all storage profiles for a VDC and filters out partial duplicates, for
+// allStorageProfiles retrieves all storage profiles for a VDC and filters out partial duplicates, for
 // example, when Veeam CDP creates a storage profile for the datastore.
-func (vdc *VDC) storageProfiles() ([]types.QueryResultProviderVdcStorageProfileRecordType, error) {
+func (vdc *VDC) allStorageProfiles() ([]*types.VdcStorageProfile, error) {
 	avdc, err := vdc.AdminOrg.GetAdminVDCById(vdc.Obj.Vdc.ID, false)
 	if err != nil {
 		return nil, err
 	}
-	profiles := make([]types.QueryResultProviderVdcStorageProfileRecordType, 0)
+	profiles := make([]*types.VdcStorageProfile, 0)
 	for _, stor := range avdc.AdminVdc.VdcStorageProfiles.VdcStorageProfile {
-		sp, err := vdc.Client.VCD.QueryProviderVdcStorageProfileByName(stor.Name, avdc.AdminVdc.ProviderVdcReference.HREF)
+		sp, err := vdc.Client.VCD.GetStorageProfileById(stor.ID)
 		if err != nil {
 			return nil, err
 		}
-		profiles = append(profiles, *sp)
+		profiles = append(profiles, sp)
 	}
-	names := make([]string, 0, len(profiles))
-	for _, prof := range profiles {
-		names = append(names, prof.Name)
-	}
-	fNames := utils.FilterPartialDuplicates(names)
-	filtered := make([]types.QueryResultProviderVdcStorageProfileRecordType, 0, len(fNames))
-	for _, n := range fNames {
-		for _, p := range profiles {
-			if n == p.Name {
-				filtered = append(filtered, p)
-			}
-		}
-	}
-	return filtered, nil
+	return profiles, nil
 }
 
-// Storage retrieves the total amount of used storage for an oVDC. If multiple storage
-// polices are attached an oVDC, the amount will include the sum of all storage policies.
+// storageProfile retrieves the default storage profile for the VDC.
+func (vdc *VDC) defaultStorageProfile() (*types.VdcStorageProfile, error) {
+	avdc, err := vdc.AdminOrg.GetAdminVDCById(vdc.Obj.Vdc.ID, false)
+	if err != nil {
+		return nil, err
+	}
+	ref, err := avdc.GetDefaultStorageProfileReference()
+	if err != nil {
+		return nil, err
+	}
+	sp, err := vdc.Client.VCD.GetStorageProfileById(ref.ID)
+	if err != nil {
+		return nil, err
+	}
+	return sp, nil
+}
+
+// Storage retrieves the total amount of 'requested' storage for an oVDC using the oVDC default
+// storage policy.
 func (vdc *VDC) Storage() DataStorage {
-	profiles, err := vdc.storageProfiles()
+	profile, err := vdc.defaultStorageProfile()
+	if err != nil {
+		return 0
+	}
+	sb := profile.StorageUsedMB * mb
+	return DataStorage(sb)
+}
+
+// StorageAll retrieves the total amount of used storage for an oVDC, totaling the 'requested'
+// storage for all storage policies.
+func (vdc *VDC) StorageAll() DataStorage {
+	profiles, err := vdc.allStorageProfiles()
 	if err != nil {
 		return 0
 	}
