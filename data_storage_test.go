@@ -3,8 +3,8 @@ package vcdusage_test
 import (
 	"testing"
 
-	"github.com/stellaraf/go-vcdusage"
 	"github.com/stretchr/testify/assert"
+	"go.stellar.af/go-vcdusage"
 )
 
 func Test_DataStorage(t *testing.T) {

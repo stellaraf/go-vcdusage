@@ -1,4 +1,4 @@
-module github.com/stellaraf/go-vcdusage
+module go.stellar.af/go-vcdusage
 
 go 1.22.1
 

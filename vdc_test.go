@@ -3,9 +3,9 @@ package vcdusage_test
 import (
 	"testing"
 
-	"github.com/stellaraf/go-vcdusage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.stellar.af/go-vcdusage"
 )
 
 func Test_VDCs(t *testing.T) {
