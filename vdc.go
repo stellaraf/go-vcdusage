@@ -89,6 +89,18 @@ func (vdcs VDCs) PoweredOnVMCount() uint64 {
 	return count
 }
 
+// VMCountWithQuery retrieves the number of VMs matching all of the provided queries in all VDCs.
+// If PoweredOn is false (default), VMs that are both powered on or off will be included.
+func (vdcs VDCs) VMCountWithQuery(queries ...VMQuerySetter) uint64 {
+	vdcSlice := rill.FromSlice(vdcs, nil)
+	count := uint64(0)
+	rill.ForEach(vdcSlice, len(vdcs), func(vdc VDC) error {
+		count += vdc.VMCountWithQuery(queries...)
+		return nil
+	})
+	return count
+}
+
 // Speed retrieves the max CPU speed of all VDCs in MHz. This is required for calculating core count.
 func (vdcs VDCs) Speed() uint64 {
 	vdcSlice := rill.FromSlice(vdcs, nil)
@@ -242,7 +254,7 @@ func (vdc *VDC) VMCount() uint64 {
 	return count
 }
 
-// PoweredOnVMCount retrieves the number of powered-on
+// PoweredOnVMCount retrieves the number of powered-on VMs deployed in the VDC.
 func (vdc *VDC) PoweredOnVMCount() uint64 {
 	ovdc, err := vdc.AdminOrg.GetVDCById(vdc.Obj.Vdc.ID, false)
 	if err != nil {
@@ -259,6 +271,56 @@ func (vdc *VDC) PoweredOnVMCount() uint64 {
 		}
 	}
 	return count
+}
+
+// VMCountWithQuery retrieves the number of VMs matching all of the provided queries.
+// If PoweredOn is false (default), VMs that are both powered on or off will be included.
+func (vdc *VDC) VMCountWithQuery(queries ...VMQuerySetter) uint64 {
+	ovdc, err := vdc.AdminOrg.GetVDCById(vdc.Obj.Vdc.ID, false)
+	if err != nil {
+		return 0
+	}
+	query := &VMQuery{
+		Name:      nil,
+		GuestOS:   nil,
+		PoweredOn: false,
+	}
+	for _, set := range queries {
+		set(query)
+	}
+
+	vms, err := ovdc.QueryVmList(types.VmQueryFilterOnlyDeployed)
+	if err != nil {
+		return 0
+	}
+	if query.PoweredOn {
+		_vms := make([]*types.QueryResultVMRecordType, 0, len(vms))
+		for _, vm := range vms {
+			if vm.Status == types.VAppStatuses[4] {
+				_vms = append(_vms, vm)
+			}
+		}
+		vms = _vms
+	}
+	if query.Name != nil {
+		_vms := make([]*types.QueryResultVMRecordType, 0, len(vms))
+		for _, vm := range vms {
+			if query.Name.MatchString(vm.Name) {
+				_vms = append(_vms, vm)
+			}
+		}
+		vms = _vms
+	}
+	if query.GuestOS != nil {
+		_vms := make([]*types.QueryResultVMRecordType, 0, len(vms))
+		for _, vm := range vms {
+			if query.GuestOS.MatchString(vm.GuestOS) {
+				_vms = append(_vms, vm)
+			}
+		}
+		vms = _vms
+	}
+	return uint64(len(vms))
 }
 
 // Org retrieves a vCloud Organization object.

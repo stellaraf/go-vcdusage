@@ -1,6 +1,7 @@
 package vcdusage_test
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -35,8 +36,9 @@ func Test_VDCs(t *testing.T) {
 			assert.Equal(t, Env.Cores, cores, "mismatching core count: %v != %v", Env.Cores, cores)
 			assert.Equal(t, Env.Memory, mem.GB(), "mismatching memory: %v != %v", Env.Memory, mem.GB())
 			assert.Equal(t, Env.Storage, stor.GB(), "mismatching storage: %v != %v", Env.Storage, stor.GB())
-			assert.Equal(t, Env.VMCount, vmCount, "mismatching VM count: %v != %v", Env.VMCount, vmCount)
-			assert.Equal(t, Env.VMCount, poweredOn, "mismatching powered-on VM count: %v != %v", Env.VMCount, vmCount)
+			total := Env.VMCountOn + Env.VMCountOff
+			assert.Equal(t, total, vmCount, "mismatching VM count: %v != %v", total, vmCount)
+			assert.Equal(t, Env.VMCountOn, poweredOn, "mismatching powered-on VM count: %v != %v", Env.VMCountOn, poweredOn)
 		})
 	}
 	t.Run("individual VDC", func(t *testing.T) {
@@ -54,8 +56,9 @@ func Test_VDCs(t *testing.T) {
 		assert.Equal(t, Env.Cores, cores, "mismatching core count: %v != %v", Env.Cores, cores)
 		assert.Equal(t, Env.Memory, mem.GB(), "mismatching memory: %v != %v", Env.Memory, mem.GB())
 		assert.Equal(t, Env.Storage, stor.GB(), "mismatching storage: %v != %v", Env.Storage, stor.GB())
-		assert.Equal(t, Env.VMCount, vmCount, "mismatching VM count: %v != %v", Env.VMCount, vmCount)
-		assert.Equal(t, Env.VMCount, poweredOn, "mismatching powered-on VM count: %v != %v", Env.VMCount, vmCount)
+		total := Env.VMCountOn + Env.VMCountOff
+		assert.Equal(t, total, vmCount, "mismatching VM count: %v != %v", total, vmCount)
+		assert.Equal(t, Env.VMCountOn, poweredOn, "mismatching powered-on VM count: %v != %v", Env.VMCountOn, poweredOn)
 	})
 	t.Run("all VDCs", func(t *testing.T) {
 		t.Parallel()
@@ -70,17 +73,20 @@ func Test_VDCs(t *testing.T) {
 		assert.Equal(t, Env.Cores, cores, "mismatching core count: %v != %v", Env.Cores, cores)
 		assert.Equal(t, Env.Memory, mem.GB(), "mismatching memory: %v != %v", Env.Memory, mem.GB())
 		assert.Equal(t, Env.Storage, stor.GB(), "mismatching storage: %v != %v", Env.Storage, stor.GB())
-		assert.Equal(t, Env.VMCount, vmCount, "mismatching VM count: %v != %v", Env.VMCount, vmCount)
-		assert.Equal(t, Env.VMCount, poweredOn, "mismatching powered-on VM count: %v != %v", Env.VMCount, vmCount)
+		total := Env.VMCountOn + Env.VMCountOff
+		assert.Equal(t, total, vmCount, "mismatching VM count: %v != %v", total, vmCount)
+		assert.Equal(t, Env.VMCountOn, poweredOn, "mismatching powered-on VM count: %v != %v", Env.VMCountOn, poweredOn)
 	})
-	t.Run("all powered off", func(t *testing.T) {
+	t.Run("guest os", func(t *testing.T) {
 		t.Parallel()
-		vdc, err := client.VDC(Env.OrgID2, Env.VdcID2)
+		vdc, err := client.VDC(Env.OrgID, Env.VdcID)
 		require.NoError(t, err)
-		stor := vdc.StorageAll()
-		vmCount := vdc.VMCount()
-		assert.NotZero(t, stor.Float64(), "storage zero")
-		assert.Equal(t, Env.Storage2, stor.GB(), "mismatching storage: %v != %v", Env.Storage2, stor.GB())
-		assert.Equal(t, Env.VMCount2, vmCount, "mismatching VM count: %v != %v", Env.VMCount2, vmCount)
+		count := vdc.VMCountWithQuery(vcdusage.VMWithGuestOSContaining("windows"))
+		assert.NotZero(t, count, "no VMs matching query")
+		assert.Equal(t, Env.WindowsCount, count, "mismatching Windows VM count: %v != %v", Env.WindowsCount, count)
+
+		count = vdc.VMCountWithQuery(vcdusage.VMPoweredOn(), vcdusage.VMWithGuestOSMatching(regexp.MustCompile(".*Windows.*")))
+		assert.NotZero(t, count, "no VMs matching query")
+		assert.Equal(t, Env.WindowsCountOn, count, "mismatching Windows VM count: %v != %v", Env.WindowsCountOn, count)
 	})
 }
