@@ -2,6 +2,8 @@
 
 ## `go-vcdusage`
 
+[![Go Reference](https://img.shields.io/badge/godoc-reference-5272B4.svg?style=for-the-badge)](https://pkg.go.dev/go.stellar.af/go-vcdusage) [![GitHub Tag](https://img.shields.io/github/v/tag/stellaraf/go-vcdusage?style=for-the-badge&label=Version)](https://github.com/stellaraf/go-vcdusage/tags)
+
 ## Testing Environment Variables
 
 The following environment variables must be set (and valid) for tests to run.
