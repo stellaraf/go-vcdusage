@@ -101,6 +101,18 @@ func (vdcs VDCs) VMCountWithQuery(queries ...VMQuerySetter) uint64 {
 	return count
 }
 
+// VMCountWithQuery retrieves the number of cores on VMs matching all of the provided queries in
+// all VDCs. If PoweredOn is false (default), VMs that are both powered on or off will be included.
+func (vdcs VDCs) VMCoreCountWithQuery(queries ...VMQuerySetter) uint64 {
+	vdcSlice := rill.FromSlice(vdcs, nil)
+	count := uint64(0)
+	rill.ForEach(vdcSlice, len(vdcs), func(vdc VDC) error {
+		count += vdc.VMCoreCountWithQuery(queries...)
+		return nil
+	})
+	return count
+}
+
 // Speed retrieves the max CPU speed of all VDCs in MHz. This is required for calculating core count.
 func (vdcs VDCs) Speed() uint64 {
 	vdcSlice := rill.FromSlice(vdcs, nil)
@@ -273,12 +285,10 @@ func (vdc *VDC) PoweredOnVMCount() uint64 {
 	return count
 }
 
-// VMCountWithQuery retrieves the number of VMs matching all of the provided queries.
-// If PoweredOn is false (default), VMs that are both powered on or off will be included.
-func (vdc *VDC) VMCountWithQuery(queries ...VMQuerySetter) uint64 {
+func (vdc *VDC) queryVMs(queries ...VMQuerySetter) ([]*types.QueryResultVMRecordType, error) {
 	ovdc, err := vdc.AdminOrg.GetVDCById(vdc.Obj.Vdc.ID, false)
 	if err != nil {
-		return 0
+		return nil, err
 	}
 	query := &VMQuery{
 		Name:      nil,
@@ -291,7 +301,7 @@ func (vdc *VDC) VMCountWithQuery(queries ...VMQuerySetter) uint64 {
 
 	vms, err := ovdc.QueryVmList(types.VmQueryFilterOnlyDeployed)
 	if err != nil {
-		return 0
+		return nil, err
 	}
 	if query.PoweredOn {
 		_vms := make([]*types.QueryResultVMRecordType, 0, len(vms))
@@ -320,7 +330,31 @@ func (vdc *VDC) VMCountWithQuery(queries ...VMQuerySetter) uint64 {
 		}
 		vms = _vms
 	}
+	return vms, nil
+}
+
+// VMCountWithQuery retrieves the number of VMs matching all of the provided queries.
+// If PoweredOn is false (default), VMs that are both powered on or off will be included.
+func (vdc *VDC) VMCountWithQuery(queries ...VMQuerySetter) uint64 {
+	vms, err := vdc.queryVMs(queries...)
+	if err != nil {
+		return 0
+	}
 	return uint64(len(vms))
+}
+
+// VMCoreCountWithQuery retrieves the number cores on VMs matching all of the provided queries.
+// If PoweredOn is false (default), VMs that are both powered on or off will be included.
+func (vdc *VDC) VMCoreCountWithQuery(queries ...VMQuerySetter) uint64 {
+	vms, err := vdc.queryVMs(queries...)
+	if err != nil {
+		return 0
+	}
+	count := uint64(0)
+	for _, vm := range vms {
+		count += uint64(vm.Cpus)
+	}
+	return count
 }
 
 // Org retrieves a vCloud Organization object.
